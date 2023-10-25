@@ -12,9 +12,21 @@ import (
 //		CREATE DATABASE dbname;
 
 const (
-	CREATE_USER_CRED_TABLE = "CREATE TABLE user_credentials (userid integer, email varchar(255), password varchar(255))"
-	CREATE_SESSION_TOKEN_TABLE = "CREATE TABLE session_tokens (token varchar(255), userid varchar(255), expiry_epoch int )"
+	CREATE_USER_CRED_TABLE = "CREATE TABLE user_credentials (userid SERIAL PRIMARY KEY, email varchar(255), password varchar(255));"
+	CREATE_SESSION_TOKEN_TABLE = "CREATE TABLE session_tokens (token varcher(255), userid int, expiry_epoch int );"
 )
+
+type UserCredentialRecord struct {
+	userid int
+	email string
+	password string
+}
+
+type SessionTokenRecord struct {
+	token string
+	userid int
+	expiry_epoch int
+}
 
 // In case we want to add a different type of DB
 type DBConnector interface {
@@ -77,14 +89,41 @@ func (pgc *PostgresConnector) CreateRequiredTables() error {
 		"session_tokens": CREATE_SESSION_TOKEN_TABLE,
 	}
 	for tablename,q := range queries {
-		if !pgc.TableExists(tablename) {
+		if true {//!pgc.TableExists(tablename) {
 			_, err := pgc.db.Exec(q)
 			if err != nil {
-				return err
+				log.Printf("	Table [%s] exists\n", tablename)
+			} else {
+				log.Printf("	Created table [%s]\n", tablename)
 			}
-		} else {
-			log.Printf("	Table [%v] exists\n", tablename)
 		}
+	}
+	return nil
+}
+
+func (pgc *PostgresConnector) QueryUser(email_hash string, password_hash string) error {
+	fmt.Printf("Querying %s\n", email_hash)
+	q := fmt.Sprintf(`SELECT * FROM user_credentials WHERE email='%s'`, email_hash)
+	rows, err := pgc.db.Query(q)
+	if err != nil {
+		fmt.Println("err = ", err)
+		return err
+	}
+	for rows.Next() {
+		var uc UserCredentialRecord
+		rows.Scan(&uc.userid, &uc.email, &uc.password)
+		fmt.Printf("  Found %+v\n", uc)
+	}
+	return nil
+}
+
+func (pgc *PostgresConnector) RegisterUser(user_hash string, password_hash string) error {
+	fmt.Printf("Registering %s %s\n", user_hash, password_hash)
+	q := fmt.Sprintf("INSERT INTO user_credentials (email, password) VALUES ('%s', '%s')", user_hash, password_hash)
+	_, err := pgc.db.Exec(q)
+	if err != nil {
+		fmt.Println("err = ", err)
+		return err
 	}
 	return nil
 }

@@ -16,9 +16,10 @@ func main() {
 
     // Consider moving to App() function
     go func() {
-    	pgc = NewPostgresConnector()
-		rt := NewRouter(pgc, 8080)
+    	pgc := NewPostgresConnector()
+		rt := NewRouter(8080, pgc)
 		rt.StartRouter()
+
     }()
 
 	sig := <-cancelChan

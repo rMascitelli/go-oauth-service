@@ -6,6 +6,7 @@ import (
 	"os"
 	"log"
 	"crypto/sha256"
+	"encoding/hex"
 )
 
 type Router struct {
@@ -54,6 +55,10 @@ func (rt *Router) RegisterPage(w http.ResponseWriter, r *http.Request) {
 
     // Get SHA256 string of user and pass
     // Make entry into DB
+    email_hash := hex.EncodeToString(getSHA256Hash(creds.email))
+    pass_hash := hex.EncodeToString(getSHA256Hash(creds.password))
+    rt.pgc.RegisterUser(email_hash, pass_hash)
+    rt.pgc.QueryUser(email_hash, pass_hash)
 }
 
 func (rt *Router) outputHTML(w http.ResponseWriter, r *http.Request, filename string) {
