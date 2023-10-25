@@ -31,7 +31,7 @@ func NewPostgresConnector() PostgresConnector {
 	    port: 5432,
 	    user: "postgres",
 	    password: "new_password",
-	    dbname: "testdb",
+	    dbname: "testdbsdsd",
 	    tablename: "example",
 	}
 	pgc.conninfo = fmt.Sprintf("user=%s password=%s host=%s dbname=%s sslmode=disable", pgc.user, pgc.password, pgc.host, pgc.dbname)
