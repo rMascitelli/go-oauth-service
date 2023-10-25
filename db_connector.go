@@ -1,4 +1,4 @@
-package dbconnector
+package main
 
 import (
 	"log"
@@ -49,4 +49,13 @@ func (pgc *PostgresConnector) ConnectToDB() (*sql.DB, error) {
 		return nil, fmt.Errorf("Couldnt open DB connection, err: %v\n", err)
 	}
 	return db, nil
+}
+
+func (pgc *PostgresConnector) query_table() {
+    r, err := pgc.db.Exec(fmt.Sprintf("SELECT * FROM %s;", pgc.tablename))
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("r = %v\n", r)
 }
