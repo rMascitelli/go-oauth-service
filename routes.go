@@ -39,26 +39,29 @@ func (rt *Router) StartRouter() {
 }
 
 func (rt *Router) HomePage(w http.ResponseWriter, r *http.Request) {
-	log.Println("Home page hit!")
+	log.Println("Home page hit - request method = ", r.Method)
 	rt.outputHTML(w, r, "public/index.html")
 }
 
 func (rt *Router) RegisterPage(w http.ResponseWriter, r *http.Request) {
 	rt.outputHTML(w, r, "public/register.html")
-	r.ParseForm()
-	log.Println("Register page hit!")   
-	creds := UserCredentialForm{
-        email:   r.FormValue("email"),
-        password: r.FormValue("password"),
-    }
-    log.Printf("Rcvd registration:\n  Email: %s\n  Password: %s\n", creds.email, creds.password)
+	if r.Method == "POST" {
+		r.ParseForm()
+		log.Println("Register page hit - request method = ", r.Method)   
+		creds := UserCredentialForm{
+	        email:   r.FormValue("email"),
+	        password: r.FormValue("password"),
+	    }
+	    log.Printf("Rcvd registration:\n  Email: %s\n  Password: %s\n", creds.email, creds.password)
 
-    // Get SHA256 string of user and pass
-    // Make entry into DB
-    email_hash := hex.EncodeToString(getSHA256Hash(creds.email))
-    pass_hash := hex.EncodeToString(getSHA256Hash(creds.password))
-    rt.pgc.RegisterUser(email_hash, pass_hash)
-    rt.pgc.QueryUser(email_hash, pass_hash)
+	    // Get SHA256 string of user and pass
+	    // Make entry into DB
+	    email_hash := hex.EncodeToString(getSHA256Hash(creds.email))
+	    pass_hash := hex.EncodeToString(getSHA256Hash(creds.password))
+	    rt.pgc.RegisterUser(email_hash, pass_hash)
+	    rt.pgc.QueryUser(email_hash, pass_hash)
+	}
+	
 }
 
 func (rt *Router) outputHTML(w http.ResponseWriter, r *http.Request, filename string) {
