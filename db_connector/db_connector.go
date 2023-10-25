@@ -50,3 +50,13 @@ func (pgc *PostgresConnector) ConnectToDB() (*sql.DB, error) {
 	}
 	return db, nil
 }
+
+func (pgc *PostgresConnector) query_table() {
+    r, err := pgc.db.Exec(fmt.Sprintf("SELECT * FROM %s;", pgc.tablename))
+    //r, err := db.Exec("SELECT * FROM fake_table")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("r = %v\n", r)
+}
