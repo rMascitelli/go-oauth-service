@@ -4,6 +4,7 @@ import (
 	"log"
 	"fmt"
 	"database/sql"
+	"errors"
 
 	_ "github.com/lib/pq"
 )
@@ -49,8 +50,8 @@ func NewPostgresConnector() PostgresConnector {
 		host: "localhost",
 	    port: 5432,
 	    user: "postgres",
-	    password: "root",
-	    dbname: "testdb",
+	    password: "new_password",
+	    dbname: "oauth_tables",
 	    tablename: "example",
 	}
 	pgc.conninfo = fmt.Sprintf("user=%s password=%s host=%s dbname=%s sslmode=disable", pgc.user, pgc.password, pgc.host, pgc.dbname)
@@ -101,24 +102,27 @@ func (pgc *PostgresConnector) CreateRequiredTables() error {
 	return nil
 }
 
-func (pgc *PostgresConnector) QueryUser(email_hash string, password_hash string) error {
+func (pgc *PostgresConnector) QueryUser(email_hash string, password_hash string) (error, UserCredentialRecord) {
 	fmt.Printf("Querying %s\n", email_hash)
+	var uc UserCredentialRecord
 	q := fmt.Sprintf(`SELECT * FROM user_credentials WHERE email='%s'`, email_hash)
 	rows, err := pgc.db.Query(q)
 	if err != nil {
 		fmt.Println("err = ", err)
-		return err
+		return err, UserCredentialRecord{}
 	}
 	for rows.Next() {
-		var uc UserCredentialRecord
 		rows.Scan(&uc.userid, &uc.email, &uc.password)
 		fmt.Printf("  Found %+v\n", uc)
 	}
-	return nil
+	if uc.password == password_hash {
+		return nil, uc
+	} else {
+		return errors.New("Mismatch in password"), uc
+	}
 }
 
 func (pgc *PostgresConnector) RegisterUser(user_hash string, password_hash string) error {
-	fmt.Printf("Registering %s %s\n", user_hash, password_hash)
 	q := fmt.Sprintf("INSERT INTO user_credentials (email, password) VALUES ('%s', '%s')", user_hash, password_hash)
 	_, err := pgc.db.Exec(q)
 	if err != nil {

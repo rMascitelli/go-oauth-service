@@ -1,19 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>Hello</title>
-  </head>
+  <h1>Hello habibi welcome</h1>
 
-  <body></body>
-  <script>
-    // We can get the token from the "access_token" query
-    // param, available in the browsers "location" global
-    const query = window.location.search.substring(1);
-    const token = query.split("access_token=")[1];
-    const nameNode = document.createTextNode(`Welcome, your access token is ${token}`);
-    document.body.appendChild(nameNode)
-  </script>
+  <div>
+    You authenticated succesfully, and have received an access token! 
+  </div>
+
+  <div>
+    Click <a href=""> this link </a> to use your access token to access a protected resource!
+  </div>
 </html>

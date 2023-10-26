@@ -32,36 +32,65 @@ func NewRouter(port int, pgc PostgresConnector) Router {
 
 func (rt *Router) StartRouter() {
 	log.Printf("Serving at port %d...\n", rt.port)
-	http.HandleFunc("/", rt.HomePage)
-	http.HandleFunc("/register", rt.RegisterPage)
-	// http.HandleFunc("/login", rt.LoginPage)
+	fs := http.FileServer(http.Dir("public"))
+	http.Handle("/", fs)
+	http.Handle("/login", fs)
+	http.Handle("/register", fs)
+	http.Handle("/welcome", fs)
+
+	http.HandleFunc("/register_user", rt.RegisterUser)
+	http.HandleFunc("/auth", rt.Auth)
 	http.ListenAndServe(fmt.Sprintf(":%d", rt.port), nil)
 }
 
 func (rt *Router) HomePage(w http.ResponseWriter, r *http.Request) {
-	log.Println("Home page hit - request method = ", r.Method)
 	rt.outputHTML(w, r, "public/index.html")
 }
 
-func (rt *Router) RegisterPage(w http.ResponseWriter, r *http.Request) {
-	rt.outputHTML(w, r, "public/register.html")
+func (rt *Router) LoginPage(w http.ResponseWriter, r *http.Request) {
+	rt.outputHTML(w, r, "public/login.html")
+}
+
+func (rt *Router) Auth(w http.ResponseWriter, r *http.Request) {
+	log.Println("Got auth request")
 	if r.Method == "POST" {
-		r.ParseForm()
-		log.Println("Register page hit - request method = ", r.Method)   
+		r.ParseForm() 
 		creds := UserCredentialForm{
 	        email:   r.FormValue("email"),
 	        password: r.FormValue("password"),
 	    }
-	    log.Printf("Rcvd registration:\n  Email: %s\n  Password: %s\n", creds.email, creds.password)
+
+	    // Get SHA256 string of user and pass
+	    // Make entry into DB
+	    email_hash := hex.EncodeToString(getSHA256Hash(creds.email))
+	    pass_hash := hex.EncodeToString(getSHA256Hash(creds.password))
+	    err, _ := rt.pgc.QueryUser(email_hash, pass_hash)
+	    if err != nil {
+	    	log.Println("Failed to authorize, err: ", err) 
+	    	http.Redirect(w, r, "/", http.StatusFound)
+	    }
+	    // Create access token using uc, store in session_token table
+		http.Redirect(w, r, "/welcome.html", http.StatusFound)
+	}
+}
+
+func (rt *Router) RegisterUser(w http.ResponseWriter, r *http.Request) {
+	log.Println("Got Register request")
+	if r.Method == "POST" {
+		r.ParseForm() 
+		creds := UserCredentialForm{
+	        email:   r.FormValue("email"),
+	        password: r.FormValue("password"),
+	    }
 
 	    // Get SHA256 string of user and pass
 	    // Make entry into DB
 	    email_hash := hex.EncodeToString(getSHA256Hash(creds.email))
 	    pass_hash := hex.EncodeToString(getSHA256Hash(creds.password))
 	    rt.pgc.RegisterUser(email_hash, pass_hash)
-	    rt.pgc.QueryUser(email_hash, pass_hash)
+	    log.Printf("Registered user with email %s\n", creds.email)
+	    http.Redirect(w, r, "/", http.StatusFound)
 	}
-	
 }
 
 func (rt *Router) outputHTML(w http.ResponseWriter, r *http.Request, filename string) {
