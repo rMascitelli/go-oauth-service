@@ -11,7 +11,7 @@ import (
 
 type Router struct {
 	port int
-	pgc PostgresConnector
+	postgres PostgresConnector
 }
 
 type UserCredentialForm struct {
@@ -19,14 +19,14 @@ type UserCredentialForm struct {
 	password string	
 }
 
-func NewRouter(port int, pgc PostgresConnector) Router {
+func NewRouter(port int, postgres PostgresConnector) Router {
 	if port <= 0 {
 		log.Fatalf("Cannot create server at port %d\n", port)
 	}
 
 	return Router {
 		port: port,
-		pgc: pgc,
+		postgres: postgres,
 	}
 }
 
@@ -40,15 +40,8 @@ func (rt *Router) StartRouter() {
 
 	http.HandleFunc("/register_user", rt.RegisterUser)
 	http.HandleFunc("/auth", rt.Auth)
+	http.HandleFunc("/introspect", rt.Introspect)
 	http.ListenAndServe(fmt.Sprintf(":%d", rt.port), nil)
-}
-
-func (rt *Router) HomePage(w http.ResponseWriter, r *http.Request) {
-	rt.outputHTML(w, r, "public/index.html")
-}
-
-func (rt *Router) LoginPage(w http.ResponseWriter, r *http.Request) {
-	rt.outputHTML(w, r, "public/login.html")
 }
 
 func (rt *Router) Auth(w http.ResponseWriter, r *http.Request) {
@@ -64,14 +57,21 @@ func (rt *Router) Auth(w http.ResponseWriter, r *http.Request) {
 	    // Make entry into DB
 	    email_hash := hex.EncodeToString(getSHA256Hash(creds.email))
 	    pass_hash := hex.EncodeToString(getSHA256Hash(creds.password))
-	    err, _ := rt.pgc.QueryUser(email_hash, pass_hash)
+	    err, uc := rt.postgres.QueryUser(email_hash, pass_hash)
 	    if err != nil {
 	    	log.Println("Failed to authorize, err: ", err) 
 	    	http.Redirect(w, r, "/", http.StatusFound)
 	    }
-	    // Create access token using uc, store in session_token table
+	    rt.postgres.CreateSessionToken(uc.userid)
 		http.Redirect(w, r, "/welcome.html", http.StatusFound)
 	}
+}
+
+func (rt *Router) Introspect(w http.ResponseWriter, r *http.Request) {
+	log.Println("Got introspect request")
+	// if r.Method == "POST" {
+
+	// }
 }
 
 func (rt *Router) RegisterUser(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +87,7 @@ func (rt *Router) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	    // Make entry into DB
 	    email_hash := hex.EncodeToString(getSHA256Hash(creds.email))
 	    pass_hash := hex.EncodeToString(getSHA256Hash(creds.password))
-	    rt.pgc.RegisterUser(email_hash, pass_hash)
+	    rt.postgres.RegisterUser(email_hash, pass_hash)
 	    log.Printf("Registered user with email %s\n", creds.email)
 	    http.Redirect(w, r, "/", http.StatusFound)
 	}

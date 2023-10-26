@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"database/sql"
 	"errors"
+	"time"
+	"encoding/hex"	
 
 	_ "github.com/lib/pq"
 )
@@ -13,8 +15,11 @@ import (
 //		CREATE DATABASE dbname;
 
 const (
+	USER_CREDENTIALS = "user_credentials"
+	SESSION_TOKENS = "session_tokens"
+
 	CREATE_USER_CRED_TABLE = "CREATE TABLE user_credentials (userid SERIAL PRIMARY KEY, email varchar(255), password varchar(255));"
-	CREATE_SESSION_TOKEN_TABLE = "CREATE TABLE session_tokens (token varcher(255), userid int, expiry_epoch int );"
+	CREATE_SESSION_TOKEN_TABLE = "CREATE TABLE session_tokens (token varchar(255), userid int, expiry_epoch int );"
 )
 
 type UserCredentialRecord struct {
@@ -86,14 +91,14 @@ func (pgc *PostgresConnector) TableExists(tablename string) bool {
 func (pgc *PostgresConnector) CreateRequiredTables() error {
 	log.Println("Creating required tables...")
 	queries := map[string]string{
-		"user_credentials": CREATE_USER_CRED_TABLE, 
-		"session_tokens": CREATE_SESSION_TOKEN_TABLE,
+		USER_CREDENTIALS: CREATE_USER_CRED_TABLE, 
+		SESSION_TOKENS: CREATE_SESSION_TOKEN_TABLE,
 	}
 	for tablename,q := range queries {
 		if true {//!pgc.TableExists(tablename) {
 			_, err := pgc.db.Exec(q)
 			if err != nil {
-				log.Printf("	Table [%s] exists\n", tablename)
+				log.Printf("	%v\n", err)
 			} else {
 				log.Printf("	Created table [%s]\n", tablename)
 			}
@@ -103,9 +108,9 @@ func (pgc *PostgresConnector) CreateRequiredTables() error {
 }
 
 func (pgc *PostgresConnector) QueryUser(email_hash string, password_hash string) (error, UserCredentialRecord) {
-	fmt.Printf("Querying %s\n", email_hash)
+	fmt.Printf("Querying [%s]...\n", email_hash[:5])
 	var uc UserCredentialRecord
-	q := fmt.Sprintf(`SELECT * FROM user_credentials WHERE email='%s'`, email_hash)
+	q := fmt.Sprintf(`SELECT * FROM %s WHERE email='%s'`, USER_CREDENTIALS, email_hash)
 	rows, err := pgc.db.Query(q)
 	if err != nil {
 		fmt.Println("err = ", err)
@@ -113,17 +118,41 @@ func (pgc *PostgresConnector) QueryUser(email_hash string, password_hash string)
 	}
 	for rows.Next() {
 		rows.Scan(&uc.userid, &uc.email, &uc.password)
-		fmt.Printf("  Found %+v\n", uc)
 	}
 	if uc.password == password_hash {
+		fmt.Println("  Success!\n")
 		return nil, uc
 	} else {
 		return errors.New("Mismatch in password"), uc
 	}
 }
 
+func (pgc *PostgresConnector) CreateSessionToken(userid int) error {
+	now := time.Now().Unix()
+	token := hex.EncodeToString(getSHA256Hash(string(now)))	
+	log.Printf("Created token - expiry: %d, userid: %d, token: %s", now+300, userid, token[:6])
+	q := fmt.Sprintf("INSERT INTO %s (userid, token, expiry_epoch) VALUES ('%d', '%s', '%d')", SESSION_TOKENS, userid, token, now+300)
+	_, err := pgc.db.Exec(q)
+	if err != nil {
+		fmt.Println("err = ", err)
+		return err
+	}
+	return nil
+}
+
 func (pgc *PostgresConnector) RegisterUser(user_hash string, password_hash string) error {
-	q := fmt.Sprintf("INSERT INTO user_credentials (email, password) VALUES ('%s', '%s')", user_hash, password_hash)
+	q := fmt.Sprintf("INSERT INTO %s (email, password) VALUES ('%s', '%s')", USER_CREDENTIALS, user_hash, password_hash)
+	_, err := pgc.db.Exec(q)
+	if err != nil {
+		fmt.Println("err = ", err)
+		return err
+	}
+	return nil
+}
+
+func (pgc *PostgresConnector) DropTable(tablename string) error {
+	log.Printf("Dropping table %s\n", tablename)
+	q := fmt.Sprintf("DROP TABLE %s", tablename)
 	_, err := pgc.db.Exec(q)
 	if err != nil {
 		fmt.Println("err = ", err)

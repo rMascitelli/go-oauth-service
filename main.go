@@ -15,8 +15,9 @@ func main() {
     signal.Notify(cancelChan, syscall.SIGTERM, syscall.SIGINT)
 
     // Consider moving to App() function
+    var pgc PostgresConnector
     go func() {
-    	pgc := NewPostgresConnector()
+    	pgc = NewPostgresConnector()
 		rt := NewRouter(8080, pgc)
 		rt.StartRouter()
 
@@ -24,4 +25,5 @@ func main() {
 
 	sig := <-cancelChan
     log.Printf("Caught signal %v", sig)
+    _ = pgc.DropTable(SESSION_TOKENS)
 }
