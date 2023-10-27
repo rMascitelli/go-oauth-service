@@ -7,6 +7,9 @@ import (
 	"log"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"io/ioutil"
+	"bytes"
 )
 
 type Router struct {
@@ -41,6 +44,7 @@ func (rt *Router) StartRouter() {
 	http.HandleFunc("/register_user", rt.RegisterUser)
 	http.HandleFunc("/auth", rt.Auth)
 	http.HandleFunc("/introspect", rt.Introspect)
+	http.HandleFunc("/access_secret", rt.AccessSecret)
 	http.ListenAndServe(fmt.Sprintf(":%d", rt.port), nil)
 }
 
@@ -63,8 +67,14 @@ func (rt *Router) Auth(w http.ResponseWriter, r *http.Request) {
 	    	http.Redirect(w, r, "/", http.StatusFound)
 	    }
 	    rt.postgres.CreateSessionToken(uc.userid)
+	    var jsonStr = `{"title":"Buy cheese and bread for breakfast."}`
+		r.Body = ioutil.NopCloser(bytes.NewBufferString(jsonStr))
 		http.Redirect(w, r, "/welcome.html", http.StatusFound)
 	}
+}
+
+type message struct {
+	title string
 }
 
 func (rt *Router) Introspect(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +82,17 @@ func (rt *Router) Introspect(w http.ResponseWriter, r *http.Request) {
 	// if r.Method == "POST" {
 
 	// }
+}
+
+func (rt *Router) AccessSecret(w http.ResponseWriter, r *http.Request) {
+	log.Println("Got introspect request, method: ", r.Method)
+	var m message
+	err := json.NewDecoder(r.Body).Decode(&m)
+	if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+	log.Println("Body - ", m)
 }
 
 func (rt *Router) RegisterUser(w http.ResponseWriter, r *http.Request) {
