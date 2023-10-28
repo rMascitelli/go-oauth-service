@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	//"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -40,11 +40,11 @@ func (rt *Router) StartRouter() {
 	http.Handle("/login", fs)
 	http.Handle("/register", fs)
 	http.Handle("/welcome", fs)
+	http.Handle("/resource", fs)
 
 	http.HandleFunc("/register_user", rt.RegisterUser)
 	http.HandleFunc("/auth", rt.Auth)
 	http.HandleFunc("/introspect", rt.Introspect)
-	http.HandleFunc("/access_secret", rt.AccessSecret)
 	http.ListenAndServe(fmt.Sprintf(":%d", rt.port), nil)
 }
 
@@ -78,20 +78,21 @@ func (rt *Router) Auth(w http.ResponseWriter, r *http.Request) {
 
 func (rt *Router) Introspect(w http.ResponseWriter, r *http.Request) {
 	log.Println("Got introspect request, method: ", r.Method)
-	authRequest := struct {
-		Token string
-	}{}
-	err := json.NewDecoder(r.Body).Decode(&authRequest)
-	if err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
+	// authRequest := struct {
+	// 	Token string
+	// }{}
+	// err := json.NewDecoder(r.Body).Decode(&authRequest)
+	// if err != nil {
+    //     http.Error(w, err.Error(), http.StatusBadRequest)
+    //     return
+    // }
 
-    if err := rt.postgres.GetToken(authRequest.Token); err != nil {
-		log.Println("Failed to create auth token, err: ", err)
-		http.Redirect(w, r, "/", http.StatusFound)
-	}
-	rt.outputHTML(w, r, "public/resource.html")
+    // if err := rt.postgres.GetToken(authRequest.Token); err != nil {
+	// 	log.Println("Failed to create auth token, err: ", err)
+	// 	http.Redirect(w, r, "/", http.StatusFound)
+	// }
+	//rt.outputHTML(w, r, "public/resource.html")
+	http.Redirect(w, r, "/resource.html", http.StatusFound)
 }
 
 func (rt *Router) RegisterUser(w http.ResponseWriter, r *http.Request) {
