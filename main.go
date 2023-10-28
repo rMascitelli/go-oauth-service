@@ -19,11 +19,11 @@ func main() {
     go func() {
     	pgc = NewPostgresConnector()
 		rt := NewRouter(8080, pgc)
+		defer func() { _ = pgc.DropTable(SESSION_TOKENS) }()
 		rt.StartRouter()
-
     }()
 
 	sig := <-cancelChan
     log.Printf("Caught signal %v", sig)
-    _ = pgc.DropTable(SESSION_TOKENS)
+
 }

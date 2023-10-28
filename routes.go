@@ -1,16 +1,16 @@
 package main
 
 import (
-	"net/http"
-	"fmt"
-	"os"
-	"log"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"io/ioutil"
-	"bytes"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
 )
+
+var CurrentToken string
 
 type Router struct {
 	port int
@@ -18,8 +18,8 @@ type Router struct {
 }
 
 type UserCredentialForm struct {
-	email	string
-	password string	
+	Email	string
+	Password string
 }
 
 func NewRouter(port int, postgres PostgresConnector) Router {
@@ -53,46 +53,45 @@ func (rt *Router) Auth(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		r.ParseForm() 
 		creds := UserCredentialForm{
-	        email:   r.FormValue("email"),
-	        password: r.FormValue("password"),
+	        Email:   r.FormValue("email"),
+	        Password: r.FormValue("password"),
 	    }
 
 	    // Get SHA256 string of user and pass
 	    // Make entry into DB
-	    email_hash := hex.EncodeToString(getSHA256Hash(creds.email))
-	    pass_hash := hex.EncodeToString(getSHA256Hash(creds.password))
+	    email_hash := hex.EncodeToString(getSHA256Hash(creds.Email))
+	    pass_hash := hex.EncodeToString(getSHA256Hash(creds.Password))
 	    err, uc := rt.postgres.QueryUser(email_hash, pass_hash)
 	    if err != nil {
 	    	log.Println("Failed to authorize, err: ", err) 
 	    	http.Redirect(w, r, "/", http.StatusFound)
 	    }
-	    rt.postgres.CreateSessionToken(uc.userid)
-	    var jsonStr = `{"title":"Buy cheese and bread for breakfast."}`
-		r.Body = ioutil.NopCloser(bytes.NewBufferString(jsonStr))
-		http.Redirect(w, r, "/welcome.html", http.StatusFound)
+	    err, token := rt.postgres.CreateAndStoreSessionToken(uc.userid)
+		if err != nil {
+			log.Println("Failed to create session token, err: ", err)
+			http.Redirect(w, r, "/", http.StatusFound)
+		}
+	    CurrentToken = token
+	    http.Redirect(w, r, "/welcome.html", http.StatusFound)
 	}
 }
 
-type message struct {
-	title string
-}
-
 func (rt *Router) Introspect(w http.ResponseWriter, r *http.Request) {
-	log.Println("Got introspect request")
-	// if r.Method == "POST" {
-
-	// }
-}
-
-func (rt *Router) AccessSecret(w http.ResponseWriter, r *http.Request) {
 	log.Println("Got introspect request, method: ", r.Method)
-	var m message
-	err := json.NewDecoder(r.Body).Decode(&m)
+	authRequest := struct {
+		Token string
+	}{}
+	err := json.NewDecoder(r.Body).Decode(&authRequest)
 	if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
     }
-	log.Println("Body - ", m)
+
+    if err := rt.postgres.GetToken(authRequest.Token); err != nil {
+		log.Println("Failed to create auth token, err: ", err)
+		http.Redirect(w, r, "/", http.StatusFound)
+	}
+	rt.outputHTML(w, r, "public/resource.html")
 }
 
 func (rt *Router) RegisterUser(w http.ResponseWriter, r *http.Request) {
@@ -100,16 +99,16 @@ func (rt *Router) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		r.ParseForm() 
 		creds := UserCredentialForm{
-	        email:   r.FormValue("email"),
-	        password: r.FormValue("password"),
+	        Email:   r.FormValue("email"),
+	        Password: r.FormValue("password"),
 	    }
 
 	    // Get SHA256 string of user and pass
 	    // Make entry into DB
-	    email_hash := hex.EncodeToString(getSHA256Hash(creds.email))
-	    pass_hash := hex.EncodeToString(getSHA256Hash(creds.password))
+	    email_hash := hex.EncodeToString(getSHA256Hash(creds.Email))
+	    pass_hash := hex.EncodeToString(getSHA256Hash(creds.Password))
 	    rt.postgres.RegisterUser(email_hash, pass_hash)
-	    log.Printf("Registered user with email %s\n", creds.email)
+	    log.Printf("Registered user with email %s\n", creds.Email)
 	    http.Redirect(w, r, "/", http.StatusFound)
 	}
 }

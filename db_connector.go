@@ -94,14 +94,12 @@ func (pgc *PostgresConnector) CreateRequiredTables() error {
 		USER_CREDENTIALS: CREATE_USER_CRED_TABLE, 
 		SESSION_TOKENS: CREATE_SESSION_TOKEN_TABLE,
 	}
-	for tablename,q := range queries {
-		if true {//!pgc.TableExists(tablename) {
-			_, err := pgc.db.Exec(q)
-			if err != nil {
-				log.Printf("	%v\n", err)
-			} else {
-				log.Printf("	Created table [%s]\n", tablename)
-			}
+	for tablename, q := range queries {
+		_, err := pgc.db.Exec(q)
+		if err != nil {
+			log.Printf("	%v\n", err)
+		} else {
+			log.Printf("	Created table [%s]\n", tablename)
 		}
 	}
 	return nil
@@ -127,7 +125,7 @@ func (pgc *PostgresConnector) QueryUser(email_hash string, password_hash string)
 	}
 }
 
-func (pgc *PostgresConnector) CreateSessionToken(userid int) error {
+func (pgc *PostgresConnector) CreateAndStoreSessionToken(userid int) (error, string) {
 	now := time.Now().Unix()
 	token := hex.EncodeToString(getSHA256Hash(string(now)))	
 	log.Printf("Created token - expiry: %d, userid: %d, token: %s", now+300, userid, token[:6])
@@ -135,9 +133,29 @@ func (pgc *PostgresConnector) CreateSessionToken(userid int) error {
 	_, err := pgc.db.Exec(q)
 	if err != nil {
 		fmt.Println("err = ", err)
+		return err, ""
+	}
+	return nil, token
+}
+
+func (pgc *PostgresConnector) GetToken(token string) error {
+	q := fmt.Sprintf(`SELECT * FROM %s WHERE email='%s'`, SESSION_TOKENS, token)
+	rows, err := pgc.db.Query(q)
+	if err != nil {
+		fmt.Println("err = ", err)
 		return err
 	}
-	return nil
+	var s SessionTokenRecord
+	for rows.Next() {
+		rows.Scan(&s.token, &s.expiry_epoch, &s.userid)
+	}
+	now := time.Now().Unix()
+	if int(now) > s.expiry_epoch {
+		return fmt.Errorf("%d > %d, token expired", now, s.expiry_epoch)
+		// Delete Token
+	} else {
+		return nil
+	}
 }
 
 func (pgc *PostgresConnector) RegisterUser(user_hash string, password_hash string) error {
