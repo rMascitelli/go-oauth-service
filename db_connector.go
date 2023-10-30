@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
-	"fmt"
 	"database/sql"
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"log"
 	"time"
-	"encoding/hex"	
 
 	_ "github.com/lib/pq"
 )
@@ -16,21 +16,21 @@ import (
 
 const (
 	USER_CREDENTIALS = "user_credentials"
-	SESSION_TOKENS = "session_tokens"
+	SESSION_TOKENS   = "session_tokens"
 
-	CREATE_USER_CRED_TABLE = "CREATE TABLE user_credentials (userid SERIAL PRIMARY KEY, email varchar(255), password varchar(255));"
+	CREATE_USER_CRED_TABLE     = "CREATE TABLE user_credentials (userid SERIAL PRIMARY KEY, email varchar(255), password varchar(255));"
 	CREATE_SESSION_TOKEN_TABLE = "CREATE TABLE session_tokens (token varchar(255), userid int, expiry_epoch int );"
 )
 
 type UserCredentialRecord struct {
-	userid int
-	email string
+	userid   int
+	email    string
 	password string
 }
 
 type SessionTokenRecord struct {
-	token string
-	userid int
+	token        string
+	userid       int
 	expiry_epoch int
 }
 
@@ -40,33 +40,33 @@ type DBConnector interface {
 }
 
 type PostgresConnector struct {
-	host string
-	port int
-	user string
-	password string
-	dbname string
+	host      string
+	port      int
+	user      string
+	password  string
+	dbname    string
 	tablename string
-	conninfo string
-	db 	*sql.DB
+	conninfo  string
+	db        *sql.DB
 }
 
 func NewPostgresConnector() PostgresConnector {
 	pgc := PostgresConnector{
-		host: "localhost",
-	    port: 5432,
-	    user: "postgres",
-	    password: "new_password",
-	    dbname: "oauth_tables",
-	    tablename: "example",
+		host:      "localhost",
+		port:      5432,
+		user:      "postgres",
+		password:  "new_password",
+		dbname:    "oauth_tables",
+		tablename: "example",
 	}
 	pgc.conninfo = fmt.Sprintf("user=%s password=%s host=%s dbname=%s sslmode=disable", pgc.user, pgc.password, pgc.host, pgc.dbname)
-	
+
 	db, err := pgc.ConnectToDB()
 	if err != nil {
 		log.Fatalf("PostgresConnector: %v\n", err)
 	}
 	pgc.db = db
-	
+
 	if err := pgc.CreateRequiredTables(); err != nil {
 		log.Fatalf("PostgresConnector: %v\n", err)
 	}
@@ -76,7 +76,7 @@ func NewPostgresConnector() PostgresConnector {
 
 func (pgc *PostgresConnector) ConnectToDB() (*sql.DB, error) {
 	log.Printf("Connecting to DB %v...\n", pgc.dbname)
-    db, err := sql.Open("postgres", pgc.conninfo)
+	db, err := sql.Open("postgres", pgc.conninfo)
 	if err != nil {
 		return nil, fmt.Errorf("Couldnt open DB connection, err: %v\n", err)
 	}
@@ -84,15 +84,15 @@ func (pgc *PostgresConnector) ConnectToDB() (*sql.DB, error) {
 }
 
 func (pgc *PostgresConnector) TableExists(tablename string) bool {
-    _, err := pgc.db.Exec(fmt.Sprintf("SELECT EXISTS ( SELECT 1 FROM pg_tables WHERE tablename = '%s' ) AS table_existence;", tablename))
-    return err == nil
+	_, err := pgc.db.Exec(fmt.Sprintf("SELECT EXISTS ( SELECT 1 FROM pg_tables WHERE tablename = '%s' ) AS table_existence;", tablename))
+	return err == nil
 }
 
 func (pgc *PostgresConnector) CreateRequiredTables() error {
 	log.Println("Creating required tables...")
 	queries := map[string]string{
-		USER_CREDENTIALS: CREATE_USER_CRED_TABLE, 
-		SESSION_TOKENS: CREATE_SESSION_TOKEN_TABLE,
+		USER_CREDENTIALS: CREATE_USER_CRED_TABLE,
+		SESSION_TOKENS:   CREATE_SESSION_TOKEN_TABLE,
 	}
 	for tablename, q := range queries {
 		_, err := pgc.db.Exec(q)
@@ -102,6 +102,7 @@ func (pgc *PostgresConnector) CreateRequiredTables() error {
 			log.Printf("	Created table [%s]\n", tablename)
 		}
 	}
+	pgc.CreateAndStoreSessionToken(123) // TODO: Only for demo purposes, delete later
 	return nil
 }
 
@@ -127,8 +128,8 @@ func (pgc *PostgresConnector) QueryUser(email_hash string, password_hash string)
 
 func (pgc *PostgresConnector) CreateAndStoreSessionToken(userid int) (error, string) {
 	now := time.Now().Unix()
-	token := hex.EncodeToString(getSHA256Hash(string(now)))	
-	log.Printf("Created token - expiry: %d, userid: %d, token: %s", now+300, userid, token[:6])
+	token := hex.EncodeToString(getSHA256Hash(string(now)))
+	log.Printf("Created token - expiry: %d, userid: %d, token: %s", now+300, userid, token)
 	q := fmt.Sprintf("INSERT INTO %s (userid, token, expiry_epoch) VALUES ('%d', '%s', '%d')", SESSION_TOKENS, userid, token, now+300)
 	_, err := pgc.db.Exec(q)
 	if err != nil {
@@ -139,7 +140,7 @@ func (pgc *PostgresConnector) CreateAndStoreSessionToken(userid int) (error, str
 }
 
 func (pgc *PostgresConnector) GetToken(token string) error {
-	q := fmt.Sprintf(`SELECT * FROM %s WHERE email='%s'`, SESSION_TOKENS, token)
+	q := fmt.Sprintf(`SELECT * FROM %s WHERE token='%s'`, SESSION_TOKENS, token)
 	rows, err := pgc.db.Query(q)
 	if err != nil {
 		fmt.Println("err = ", err)
@@ -147,7 +148,7 @@ func (pgc *PostgresConnector) GetToken(token string) error {
 	}
 	var s SessionTokenRecord
 	for rows.Next() {
-		rows.Scan(&s.token, &s.expiry_epoch, &s.userid)
+		rows.Scan(&s.token, &s.userid, &s.expiry_epoch)
 	}
 	now := time.Now().Unix()
 	if int(now) > s.expiry_epoch {
