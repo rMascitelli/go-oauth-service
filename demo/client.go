@@ -78,6 +78,12 @@ func outputHTML(w http.ResponseWriter, filename string, data interface{}) {
 	}
 }
 
+//TODO:
+//	Currently, client is sending AUTH requests directly to Auth Service and serving its own resource
+//	Need to split interactions into 2 categories:
+//		Auth service: 		Register, Login, and getting to Welcome.html
+//		Resource service: 	Use token from Auth service to make request, get resource.html back
+
 func main() {
 	http.HandleFunc("/", Login)
 	http.HandleFunc("/authenticate", Authenticate)
