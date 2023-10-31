@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-  <h1>Hello habibi welcome</h1>
+  <h1>Hello my friend, welcome!</h1>
 
   <div>
     You authenticated succesfully, and have received an access token! 
@@ -8,7 +8,7 @@
 
   <div>
     Click 
-    <form method="post" action="/introspect" class="inline">
+    <form method="post" action="{{.resourceEndpoint}}" class="inline">
       <button type="submit" name="submit_param" value="submit_value" class="link-button">
        this link 
       </button>
