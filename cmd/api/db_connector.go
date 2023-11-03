@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -71,6 +70,7 @@ func NewPostgresConnector() PostgresConnector {
 		log.Fatalf("PostgresConnector: %v\n", err)
 	}
 
+	pgc.StoreDummyToken() // TODO: Remove - this is for testing Introspect easily
 	return pgc
 }
 
@@ -102,7 +102,6 @@ func (pgc *PostgresConnector) CreateRequiredTables() error {
 			log.Printf("	Created table [%s]\n", tablename)
 		}
 	}
-	pgc.CreateAndStoreSessionToken(123) // TODO: Only for demo purposes, delete later
 	return nil
 }
 
@@ -112,7 +111,6 @@ func (pgc *PostgresConnector) QueryUser(email_hash string, password_hash string)
 	q := fmt.Sprintf(`SELECT * FROM %s WHERE email='%s'`, USER_CREDENTIALS, email_hash)
 	rows, err := pgc.db.Query(q)
 	if err != nil {
-		fmt.Println("err = ", err)
 		return err, UserCredentialRecord{}
 	}
 	for rows.Next() {
@@ -122,7 +120,7 @@ func (pgc *PostgresConnector) QueryUser(email_hash string, password_hash string)
 		fmt.Println("  Success!\n")
 		return nil, uc
 	} else {
-		return errors.New("Mismatch in password"), uc
+		return fmt.Errorf("Mismatch in password, expected %s, got %s", uc.password, password_hash), uc
 	}
 }
 
@@ -137,6 +135,16 @@ func (pgc *PostgresConnector) CreateAndStoreSessionToken(userid int) (error, str
 		return err, ""
 	}
 	return nil, token
+}
+
+func (pgc *PostgresConnector) StoreDummyToken() {
+	now := time.Now().Unix()
+	q := fmt.Sprintf("INSERT INTO %s (userid, token, expiry_epoch) VALUES ('%d', '%s', '%d')", SESSION_TOKENS, 555, "123", now+300)
+	_, err := pgc.db.Exec(q)
+	if err != nil {
+		fmt.Println("err = ", err)
+		return
+	}
 }
 
 func (pgc *PostgresConnector) GetToken(token string) error {

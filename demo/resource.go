@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	INTROSPECT_URL = "http://localhost:8080/introspect"
+	INTROSPECT_ENDPOINT = "http://localhost:8080/introspect"
 )
 
 type Token struct {
@@ -17,6 +17,7 @@ type Token struct {
 }
 
 func GetResource(w http.ResponseWriter, r *http.Request) {
+	// Decode token
 	var t Token
 	err := json.NewDecoder(r.Body).Decode(&t)
 	if err != nil {
@@ -25,10 +26,11 @@ func GetResource(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Got token: %+v\n", t)
 
+	// Make new request
 	var jsonData = []byte(fmt.Sprintf(`{
 		"token": "%s"
 	}`, t.Stringval))
-	request, error := http.NewRequest("POST", INTROSPECT_URL, bytes.NewBuffer(jsonData))
+	request, error := http.NewRequest("POST", INTROSPECT_ENDPOINT, bytes.NewBuffer(jsonData))
 	client := &http.Client{}
 	response, error := client.Do(request)
 	if error != nil {

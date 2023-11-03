@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -13,6 +14,11 @@ const (
 	RESOURCE_URL     = "http://localhost:5555"
 	AUTH_SERVICE_URL = "http://localhost:8080"
 )
+
+type UserCredentialForm struct {
+	Email    string
+	Password string
+}
 
 func testSendToken() {
 	fmt.Println("HTTP JSON POST URL:", RESOURCE_URL)
@@ -36,36 +42,42 @@ func testSendToken() {
 	fmt.Println("response Body:", string(body))
 }
 
-func Authenticate(w http.ResponseWriter, r *http.Request) {
-	log.Println("Sending auth request...")
-	buf, _ := ioutil.ReadAll(r.Body)
-	rdr := ioutil.NopCloser(bytes.NewBuffer(buf))
+func SendRegisterRequest(w http.ResponseWriter, r *http.Request) {
+	SendUserCredentialForm(w, r, AUTH_SERVICE_URL+"/register", "/", "/")
+}
 
+func SendAuthRequest(w http.ResponseWriter, r *http.Request) {
+	SendUserCredentialForm(w, r, AUTH_SERVICE_URL+"/auth", "/welcome", "/")
+}
+
+func SendUserCredentialForm(w http.ResponseWriter, r *http.Request, endpointURL string, passRoute string, failRoute string) {
+	log.Printf("Sending UserCred form request to %s...\n", endpointURL)
+	r.ParseForm()
+	creds := UserCredentialForm{
+		Email:    r.FormValue("email"),
+		Password: r.FormValue("password"),
+	}
 	client := &http.Client{}
-	request, error := http.NewRequest("POST", AUTH_SERVICE_URL+"/auth", rdr)
+	json, err := json.Marshal(creds)
+	if err != nil {
+		panic(err)
+	}
+	request, err := http.NewRequest("POST", endpointURL, bytes.NewBuffer(json))
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
-	response, error := client.Do(request)
-	if error != nil {
-		panic(error)
+	response, err := client.Do(request)
+	if err != nil {
+		panic(err)
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode == 200 {
-		http.Redirect(w, r, "/resource", http.StatusFound)
+		http.Redirect(w, r, passRoute, http.StatusFound)
 	} else {
-		http.Redirect(w, r, "/", http.StatusFound)
+		http.Redirect(w, r, failRoute, http.StatusFound)
 	}
 }
 
-func Login(w http.ResponseWriter, r *http.Request) {
-	authURL := map[string]interface{}{"authEndpoint": AUTH_SERVICE_URL + "/auth"}
-	outputHTML(w, "../public/login.html", authURL)
-}
-
-func Resource(w http.ResponseWriter, r *http.Request) {
-	outputHTML(w, "../public/resource.html", nil)
-}
-
+// outputHTML meant for use with HTML Templates
 func outputHTML(w http.ResponseWriter, filename string, data interface{}) {
 	t, err := template.ParseFiles(filename)
 	if err != nil {
@@ -85,10 +97,10 @@ func outputHTML(w http.ResponseWriter, filename string, data interface{}) {
 //		Resource service: 	Use token from Auth service to make request, get resource.html back
 
 func main() {
-	http.HandleFunc("/", Login)
-	http.HandleFunc("/authenticate", Authenticate)
-	http.HandleFunc("/resource", Resource)
+	fs := http.FileServer(http.Dir("../public"))
+	http.Handle("/", fs)
+	http.HandleFunc("/send_register_request", SendRegisterRequest)
+	http.HandleFunc("/send_auth_request", SendAuthRequest)
 	log.Println("Serving at port 1234")
 	http.ListenAndServe(":1234", nil)
-
 }

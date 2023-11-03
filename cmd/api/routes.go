@@ -4,14 +4,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-
-	//"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 )
 
-var CurrentToken string
+//OAuth Specification is described in these RFC Articles:
+//	https://www.rfc-editor.org/rfc/rfc6749
+//	https://www.rfc-editor.org/rfc/rfc7662
 
 type Router struct {
 	port     int
@@ -34,35 +34,35 @@ func NewRouter(port int, postgres PostgresConnector) Router {
 	}
 }
 
-func (rt *Router) StartRouter() {
-	log.Printf("Serving at port %d...\n", rt.port)
-	http.HandleFunc("/register_user", rt.RegisterUser)
-	http.HandleFunc("/auth", rt.Auth)
-	http.HandleFunc("/introspect", rt.Introspect)
-	http.ListenAndServe(fmt.Sprintf(":%d", rt.port), nil)
+func (r *Router) StartRouter() {
+	log.Printf("Serving at port %d...\n", r.port)
+	http.HandleFunc("/register", r.RegisterUser)
+	http.HandleFunc("/auth", r.Auth)
+	http.HandleFunc("/introspect", r.Introspect)
+	http.ListenAndServe(fmt.Sprintf(":%d", r.port), nil)
 }
 
-func (rt *Router) Auth(w http.ResponseWriter, r *http.Request) {
+func (r *Router) Auth(w http.ResponseWriter, req *http.Request) {
 	log.Println("Got auth request")
-	if r.Method == "POST" {
-		r.ParseForm()
+	if req.Method == "POST" {
+		req.ParseForm()
 		creds := UserCredentialForm{
-			Email:    r.FormValue("email"),
-			Password: r.FormValue("password"),
+			Email:    req.FormValue("email"),
+			Password: req.FormValue("password"),
 		}
 
 		// Get SHA256 string of user and pass
 		// Make entry into DB
 		email_hash := hex.EncodeToString(getSHA256Hash(creds.Email))
 		pass_hash := hex.EncodeToString(getSHA256Hash(creds.Password))
-		err, uc := rt.postgres.QueryUser(email_hash, pass_hash)
+		err, uc := r.postgres.QueryUser(email_hash, pass_hash)
 		if err != nil {
 			log.Println("Failed to authorize, err: ", err)
 			writeJSONResponse(w, 400, "Failure")
 			return
 		}
 
-		err, _ = rt.postgres.CreateAndStoreSessionToken(uc.userid)
+		err, _ = r.postgres.CreateAndStoreSessionToken(uc.userid)
 		if err != nil {
 			log.Println("Failed to create session token, err: ", err)
 			writeJSONResponse(w, 400, "Failure")
@@ -74,41 +74,44 @@ func (rt *Router) Auth(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (rt *Router) Introspect(w http.ResponseWriter, r *http.Request) {
-	log.Println("Got introspect request, method: ", r.Method)
+func (r *Router) Introspect(w http.ResponseWriter, req *http.Request) {
+	log.Println("Got introspect request, method: ", req.Method)
 	authRequest := struct {
 		Token string `json:"token"`
 	}{}
-	err := json.NewDecoder(r.Body).Decode(&authRequest)
+	err := json.NewDecoder(req.Body).Decode(&authRequest)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeJSONResponse(w, 400, "Failure")
 		return
 	}
 
-	if err := rt.postgres.GetToken(authRequest.Token); err != nil {
+	if err := r.postgres.GetToken(authRequest.Token); err != nil {
 		log.Println("Failed to get token, err: ", err)
-		http.Redirect(w, r, "/", http.StatusFound)
+		writeJSONResponse(w, 400, "Failure")
+		return
 	}
-	//rt.outputHTML(w, r, "public/resource.html")
-	http.Redirect(w, r, "/resource.html", http.StatusFound)
+	writeJSONResponse(w, 200, "Success!")
 }
 
-func (rt *Router) RegisterUser(w http.ResponseWriter, r *http.Request) {
-	log.Println("Got Register request")
-	if r.Method == "POST" {
-		r.ParseForm()
-		creds := UserCredentialForm{
-			Email:    r.FormValue("email"),
-			Password: r.FormValue("password"),
+func (r *Router) RegisterUser(w http.ResponseWriter, req *http.Request) {
+	log.Printf("Got register request\n")
+	if req.Method == "POST" {
+		var uc UserCredentialForm
+		err := json.NewDecoder(req.Body).Decode(&uc)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			writeJSONResponse(w, 400, "Failure")
+			return
 		}
+		log.Printf("Got register request: %+v\n", uc)
 
 		// Get SHA256 string of user and pass
 		// Make entry into DB
-		email_hash := hex.EncodeToString(getSHA256Hash(creds.Email))
-		pass_hash := hex.EncodeToString(getSHA256Hash(creds.Password))
-		rt.postgres.RegisterUser(email_hash, pass_hash)
-		log.Printf("Registered user with email %s\n", creds.Email)
-		http.Redirect(w, r, "/", http.StatusFound)
+		email_hash := hex.EncodeToString(getSHA256Hash(uc.Email))
+		pass_hash := hex.EncodeToString(getSHA256Hash(uc.Password))
+		r.postgres.RegisterUser(email_hash, pass_hash)
+		log.Printf("Registered user with email %s\n", uc.Email)
+		writeJSONResponse(w, 200, "Success!")
 	}
 }
 
