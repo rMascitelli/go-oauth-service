@@ -20,8 +20,12 @@ type Router struct {
 }
 
 type UserCredentialForm struct {
-	Email    string
-	Password string
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type IntrospectResponse struct {
+	Active bool `json:"active"`
 }
 
 func NewRouter(port int, postgres PostgresConnector) Router {
@@ -44,26 +48,28 @@ func (r *Router) StartRouter() {
 }
 
 func (r *Router) Auth(w http.ResponseWriter, req *http.Request) {
-	log.Println("Got auth request")
 	if req.Method == "POST" {
-		req.ParseForm()
-		creds := UserCredentialForm{
-			Email:    req.FormValue("email"),
-			Password: req.FormValue("password"),
+		uc := UserCredentialForm{}
+		err := json.NewDecoder(req.Body).Decode(&uc)
+		if err != nil {
+			log.Println("Failed to Auth user")
+			writeJSONResponse(w, 400, "Failure")
+			return
 		}
+		log.Printf("Got auth request: %+v\n", uc)
 
 		// Get SHA256 string of user and pass
 		// Make entry into DB
-		email_hash := hex.EncodeToString(getSHA256Hash(creds.Email))
-		pass_hash := hex.EncodeToString(getSHA256Hash(creds.Password))
-		err, uc := r.postgres.QueryUser(email_hash, pass_hash)
+		email_hash := hex.EncodeToString(getSHA256Hash(uc.Email))
+		pass_hash := hex.EncodeToString(getSHA256Hash(uc.Password))
+		err, queried_user := r.postgres.QueryUser(email_hash, pass_hash)
 		if err != nil {
 			log.Println("Failed to authorize, err: ", err)
 			writeJSONResponse(w, 400, "Failure")
 			return
 		}
 
-		err, _ = r.postgres.CreateAndStoreSessionToken(uc.userid)
+		err, _ = r.postgres.CreateAndStoreSessionToken(queried_user.userid)
 		if err != nil {
 			log.Println("Failed to create session token, err: ", err)
 			writeJSONResponse(w, 400, "Failure")
@@ -75,38 +81,12 @@ func (r *Router) Auth(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *Router) Introspect(w http.ResponseWriter, req *http.Request) {
-	log.Println("Got introspect request, method: ", req.Method)
-	authRequest := struct {
-		Token string `json:"token"`
-	}{}
-	introspectResponse := struct {
-		ActiveStatus bool
-	}{}
-	err := json.NewDecoder(req.Body).Decode(&authRequest)
-	if err != nil {
-		introspectResponse.ActiveStatus = false
-		writeJSONResponse(w, 400, introspectResponse)
-		return
-	}
-
-	if err := r.postgres.GetToken(authRequest.Token); err != nil {
-		log.Println("Failed to get token, err: ", err)
-		writeJSONResponse(w, 400, introspectResponse)
-		return
-	}
-	log.Println("Introspect success!")
-	introspectResponse.ActiveStatus = true
-	writeJSONResponse(w, 200, introspectResponse)
-}
-
 func (r *Router) RegisterUser(w http.ResponseWriter, req *http.Request) {
-	log.Printf("Got register request\n")
 	if req.Method == "POST" {
-		var uc UserCredentialForm
+		uc := UserCredentialForm{}
 		err := json.NewDecoder(req.Body).Decode(&uc)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			log.Println("Failed to register user")
 			writeJSONResponse(w, 400, "Failure")
 			return
 		}
@@ -122,16 +102,41 @@ func (r *Router) RegisterUser(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (r *Router) Introspect(w http.ResponseWriter, req *http.Request) {
+	log.Println("Got introspect request, method: ", req.Method)
+	authRequest := struct {
+		Token string `json:"token"`
+	}{}
+	introspectResponse := IntrospectResponse{}
+	err := json.NewDecoder(req.Body).Decode(&authRequest)
+	if err != nil {
+		introspectResponse.Active = false
+		writeJSONResponse(w, 400, introspectResponse)
+		return
+	}
+
+	if err := r.postgres.GetToken(authRequest.Token); err != nil {
+		log.Println("Failed to get token, err: ", err)
+		writeJSONResponse(w, 400, introspectResponse)
+		return
+	}
+	log.Println("Introspect success!")
+	introspectResponse.Active = true
+	writeJSONResponse(w, 200, introspectResponse)
+}
+
 func writeJSONResponse(w http.ResponseWriter, statusCode int, data any) {
 	w.WriteHeader(statusCode)
 	w.Header().Set("Content-Type", "application/json")
 	var jsonResp []byte
 	var err error
 	if reflect.ValueOf(data).Kind() == reflect.String {
+		log.Println("Sending message - ", data)
 		resp := make(map[string]string)
 		resp["message"] = data.(string)
 		jsonResp, err = json.Marshal(resp)
 	} else {
+		log.Printf("Sending message - %+v", data)
 		jsonResp, err = json.Marshal(data)
 	}
 	if err != nil {

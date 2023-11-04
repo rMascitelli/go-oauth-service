@@ -16,6 +16,10 @@ type Token struct {
 	Stringval string `json:"token"`
 }
 
+type IntrospectResponse struct {
+	Active bool `json:"active"`
+}
+
 func AccessResource(w http.ResponseWriter, r *http.Request) {
 	log.Println("Someone is trying to access the resource...")
 	// Decode token
@@ -42,11 +46,8 @@ func AccessResource(w http.ResponseWriter, r *http.Request) {
 	}
 	defer response.Body.Close()
 
-	introspect_resp := struct {
-		Active bool `json:"active"`
-	}{
-		Active: false,
-	}
+	introspect_resp := IntrospectResponse{}
+	log.Printf("Introspect response: %+v\n", introspect_resp)
 	err = json.NewDecoder(response.Body).Decode(&introspect_resp)
 	if err != nil {
 		log.Println("Error decoding response, err: ", err)

@@ -15,8 +15,8 @@ const (
 )
 
 type UserCredentialForm struct {
-	Email    string
-	Password string
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 // TODO: What is a more secure way to store this access token?
@@ -51,7 +51,7 @@ func SendRegisterRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func SendAuthRequest(w http.ResponseWriter, r *http.Request) {
-	SendUserCredentialForm(w, r, AUTH_SERVICE_URL+"/auth", "/welcome", "/")
+	SendUserCredentialForm(w, r, AUTH_SERVICE_URL+"/auth", "/welcome.html", "/")
 }
 
 func SendUserCredentialForm(w http.ResponseWriter, r *http.Request, endpointURL string, passRoute string, failRoute string) {
