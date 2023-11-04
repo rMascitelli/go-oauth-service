@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
 )
@@ -20,13 +19,17 @@ type UserCredentialForm struct {
 	Password string
 }
 
-func testSendToken() {
+// TODO: What is a more secure way to store this access token?
+var AccessToken string
+
+func GetResource(w http.ResponseWriter, r *http.Request) {
+	AccessToken = "123"
 	fmt.Println("HTTP JSON POST URL:", RESOURCE_URL)
 
-	var jsonData = []byte(`{
-		"token": "12345"
-	}`)
-	request, error := http.NewRequest("POST", RESOURCE_URL, bytes.NewBuffer(jsonData))
+	var introspectReq = []byte(fmt.Sprintf(`{
+		"token": "%s"
+	}`, AccessToken))
+	request, error := http.NewRequest("POST", RESOURCE_URL+"/access_resource", bytes.NewBuffer(introspectReq))
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
 
 	client := &http.Client{}
@@ -36,10 +39,11 @@ func testSendToken() {
 	}
 	defer response.Body.Close()
 
-	fmt.Println("response Status:", response.Status)
-	fmt.Println("response Headers:", response.Header)
-	body, _ := ioutil.ReadAll(response.Body)
-	fmt.Println("response Body:", string(body))
+	if response.StatusCode == 200 {
+		http.Redirect(w, r, "/resource.html", http.StatusFound)
+	} else {
+		http.Redirect(w, r, "/", http.StatusFound)
+	}
 }
 
 func SendRegisterRequest(w http.ResponseWriter, r *http.Request) {
@@ -97,10 +101,12 @@ func outputHTML(w http.ResponseWriter, filename string, data interface{}) {
 //		Resource service: 	Use token from Auth service to make request, get resource.html back
 
 func main() {
+	AccessToken = ""
 	fs := http.FileServer(http.Dir("../public"))
 	http.Handle("/", fs)
 	http.HandleFunc("/send_register_request", SendRegisterRequest)
 	http.HandleFunc("/send_auth_request", SendAuthRequest)
+	http.HandleFunc("/get_resource", GetResource)
 	log.Println("Serving at port 1234")
 	http.ListenAndServe(":1234", nil)
 }

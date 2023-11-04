@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"reflect"
 )
 
 //OAuth Specification is described in these RFC Articles:
@@ -79,18 +80,24 @@ func (r *Router) Introspect(w http.ResponseWriter, req *http.Request) {
 	authRequest := struct {
 		Token string `json:"token"`
 	}{}
+	introspectResponse := struct {
+		ActiveStatus bool
+	}{}
 	err := json.NewDecoder(req.Body).Decode(&authRequest)
 	if err != nil {
-		writeJSONResponse(w, 400, "Failure")
+		introspectResponse.ActiveStatus = false
+		writeJSONResponse(w, 400, introspectResponse)
 		return
 	}
 
 	if err := r.postgres.GetToken(authRequest.Token); err != nil {
 		log.Println("Failed to get token, err: ", err)
-		writeJSONResponse(w, 400, "Failure")
+		writeJSONResponse(w, 400, introspectResponse)
 		return
 	}
-	writeJSONResponse(w, 200, "Success!")
+	log.Println("Introspect success!")
+	introspectResponse.ActiveStatus = true
+	writeJSONResponse(w, 200, introspectResponse)
 }
 
 func (r *Router) RegisterUser(w http.ResponseWriter, req *http.Request) {
@@ -115,12 +122,18 @@ func (r *Router) RegisterUser(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func writeJSONResponse(w http.ResponseWriter, statusCode int, message string) {
+func writeJSONResponse(w http.ResponseWriter, statusCode int, data any) {
 	w.WriteHeader(statusCode)
 	w.Header().Set("Content-Type", "application/json")
-	resp := make(map[string]string)
-	resp["message"] = message
-	jsonResp, err := json.Marshal(resp)
+	var jsonResp []byte
+	var err error
+	if reflect.ValueOf(data).Kind() == reflect.String {
+		resp := make(map[string]string)
+		resp["message"] = data.(string)
+		jsonResp, err = json.Marshal(resp)
+	} else {
+		jsonResp, err = json.Marshal(data)
+	}
 	if err != nil {
 		log.Fatalf("Error happened in JSON marshal. Err: %s", err)
 	}

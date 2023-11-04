@@ -49,7 +49,7 @@ type PostgresConnector struct {
 	db        *sql.DB
 }
 
-func NewPostgresConnector() PostgresConnector {
+func NewPostgresConnector(demo bool) PostgresConnector {
 	pgc := PostgresConnector{
 		host:      "localhost",
 		port:      5432,
@@ -70,7 +70,10 @@ func NewPostgresConnector() PostgresConnector {
 		log.Fatalf("PostgresConnector: %v\n", err)
 	}
 
-	pgc.StoreDummyToken() // TODO: Remove - this is for testing Introspect easily
+	if demo {
+		log.Println("Starting in demo mode!")
+		pgc.StoreDummyToken() // TODO: Remove - this is for testing Introspect easily
+	}
 	return pgc
 }
 
