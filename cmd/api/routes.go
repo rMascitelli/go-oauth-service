@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"reflect"
+	"strings"
 )
 
 //OAuth Specification is described in these RFC Articles:
@@ -41,7 +43,7 @@ func NewRouter(port int, postgres PostgresConnector) Router {
 
 func (r *Router) StartRouter() {
 	log.Printf("Serving at port %d...\n", r.port)
-	http.HandleFunc("/register", r.RegisterUser)
+	http.HandleFunc("/register", r.Register)
 	http.HandleFunc("/auth", r.Auth)
 	http.HandleFunc("/introspect", r.Introspect)
 	http.ListenAndServe(fmt.Sprintf(":%d", r.port), nil)
@@ -81,24 +83,39 @@ func (r *Router) Auth(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *Router) RegisterUser(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "POST" {
-		uc := UserCredentialForm{}
-		err := json.NewDecoder(req.Body).Decode(&uc)
-		if err != nil {
-			log.Println("Failed to register user")
-			writeJSONResponse(w, 400, "Failure")
-			return
-		}
-		log.Printf("Got register request: %+v\n", uc)
+func (r *Router) Register(w http.ResponseWriter, req *http.Request) {
+	log.Printf("Got request for - %s\n", req.URL)
+	log.Printf("Got request for - %s\n", req.URL.RawQuery)
+	qKey, qVal, _ := strings.Cut(req.URL.RawQuery, "=")
+	if qKey == "registry_type" {
+		if qVal == "user" {
+			uc := UserCredentialForm{}
+			err := json.NewDecoder(req.Body).Decode(&uc)
+			if err != nil {
+				log.Println("Failed to register user")
+				writeJSONResponse(w, 400, "Failure")
+				return
+			}
+			log.Printf("  Got User register request: %+v\n", uc)
 
-		// Get SHA256 string of user and pass
-		// Make entry into DB
-		email_hash := hex.EncodeToString(getSHA256Hash(uc.Email))
-		pass_hash := hex.EncodeToString(getSHA256Hash(uc.Password))
-		r.postgres.RegisterUser(email_hash, pass_hash)
-		log.Printf("Registered user with email %s\n", uc.Email)
-		writeJSONResponse(w, 200, "Success!")
+			// Get SHA256 string of user and pass
+			// Make entry into DB
+			email_hash := hex.EncodeToString(getSHA256Hash(uc.Email))
+			pass_hash := hex.EncodeToString(getSHA256Hash(uc.Password))
+			r.postgres.RegisterUser(email_hash, pass_hash)
+			log.Printf("  Registered user with email %s\n", uc.Email)
+			writeJSONResponse(w, 200, "Success!")
+			url.ParseQuery("")
+		} else if qVal == "service" {
+			log.Println("  I dont know how to register services yet!")
+		} else {
+			log.Println("  Bad query param: ", qVal)
+			writeJSONResponse(w, 400, "Failure!")
+		}
+	} else {
+		errStr := fmt.Sprintf("  Unknown query params: %s\n", req.URL.RawQuery)
+		log.Println(errStr)
+		writeJSONResponse(w, 400, errStr)
 	}
 }
 
