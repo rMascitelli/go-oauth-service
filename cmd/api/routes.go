@@ -44,12 +44,12 @@ func NewRouter(port int, postgres PostgresConnector) Router {
 func (r *Router) StartRouter() {
 	log.Printf("Serving at port %d...\n", r.port)
 	http.HandleFunc("/register", r.Register)
-	http.HandleFunc("/auth", r.Auth)
+	http.HandleFunc("/login", r.Login)
 	http.HandleFunc("/introspect", r.Introspect)
 	http.ListenAndServe(fmt.Sprintf(":%d", r.port), nil)
 }
 
-func (r *Router) Auth(w http.ResponseWriter, req *http.Request) {
+func (r *Router) Login(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "POST" {
 		uc := UserCredentialForm{}
 		err := json.NewDecoder(req.Body).Decode(&uc)
