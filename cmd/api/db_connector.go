@@ -80,7 +80,8 @@ func NewPostgresConnector(demo bool) PostgresConnector {
 
 func (pgc *PostgresConnector) StoreDummyToken() {
 	now := time.Now().Unix()
-	q := fmt.Sprintf("INSERT INTO %s (userid, token, expiry_epoch) VALUES ('%d', '%s', '%d')", SESSION_TOKENS, 555, "123", now+300)
+	log.Println("Creating Dummy token '123' for userID 555")
+	q := fmt.Sprintf("INSERT INTO %s (userid, token, expiry_epoch) VALUES ('%d', '%s', '%d')", SESSION_TOKENS, 555, "123", now+6000)
 	_, err := pgc.db.Exec(q)
 	if err != nil {
 		fmt.Println("err = ", err)
