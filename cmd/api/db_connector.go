@@ -122,7 +122,7 @@ func (pgc *PostgresConnector) CreateRequiredTables() error {
 
 func (pgc *PostgresConnector) CreateAndStoreSessionToken(userid int) (error, string) {
 	now := time.Now().Unix()
-	token := hex.EncodeToString(getSHA256Hash(string(now)))
+	token := hex.EncodeToString(getSHA256Hash(fmt.Sprint(now)))
 	log.Printf("Created token - expiry: %d, userid: %d, token: %s", now+300, userid, token)
 	q := fmt.Sprintf("INSERT INTO %s (userid, token, expiry_epoch) VALUES ('%d', '%s', '%d')", SESSION_TOKENS, userid, token, now+300)
 	_, err := pgc.db.Exec(q)

@@ -60,13 +60,9 @@ func (h *Handler) HandleRegistry(req *http.Request) error {
 			return nil
 		} else if qVal == "service" {
 			// RegisterService()
-			errStr := "I dont know how to register services yet!"
-			log.Println("  " + errStr)
-			return errors.New(errStr)
+			return errors.New("I dont know how to register services yet!")
 		} else {
-			errStr := fmt.Sprintf("Invalid registry_type: %s", qVal)
-			log.Println("  " + errStr)
-			return errors.New(errStr)
+			return errors.New(fmt.Sprintf("Invalid registry_type: %s", qVal))
 		}
 	} else {
 		errStr := fmt.Sprintf("  Unknown query params: %s\n", req.URL.RawQuery)

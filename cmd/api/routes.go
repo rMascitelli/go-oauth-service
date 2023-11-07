@@ -42,8 +42,10 @@ func (r *Router) Login(w http.ResponseWriter, req *http.Request) {
 
 func (r *Router) Register(w http.ResponseWriter, req *http.Request) {
 	if err := r.handler.HandleRegistry(req); err != nil {
+		log.Printf("Error occured while handling Registry, err:\n  %v\n", err)
 		writeJSONResponse(w, 400, err.Error())
 	} else {
+		log.Printf("Succesfully registered")
 		writeJSONResponse(w, 200, "Success!")
 	}
 }
@@ -54,7 +56,7 @@ func (r *Router) Introspect(w http.ResponseWriter, req *http.Request) {
 		log.Printf("Error occured while handling Introspect, err:\n  %v\n", err)
 		writeJSONResponse(w, 400, err.Error())
 	} else {
-		log.Printf("Succesfully authenticated")
+		log.Printf("Token is valid!")
 		writeJSONResponse(w, 200, introspectResponse)
 	}
 }
