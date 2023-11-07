@@ -73,6 +73,7 @@ func NewPostgresConnector(demo bool) PostgresConnector {
 	if demo {
 		log.Println("Starting in demo mode!")
 		pgc.StoreDummyToken() // TODO: Remove - this is for testing Introspect easily
+		pgc.RegisterUser("root", "dev")
 	}
 	return pgc
 }
@@ -118,8 +119,54 @@ func (pgc *PostgresConnector) CreateRequiredTables() error {
 	return nil
 }
 
-func (pgc *PostgresConnector) QueryUser(email_hash string, password_hash string) (error, UserCredentialRecord) {
-	log.Printf("Querying [%s:%s]...\n", email_hash[:5], password_hash[:5])
+func (pgc *PostgresConnector) CreateAndStoreSessionToken(userid int) (error, string) {
+	now := time.Now().Unix()
+	token := hex.EncodeToString(getSHA256Hash(string(now)))
+	log.Printf("Created token - expiry: %d, userid: %d, token: %s", now+300, userid, token)
+	q := fmt.Sprintf("INSERT INTO %s (userid, token, expiry_epoch) VALUES ('%d', '%s', '%d')", SESSION_TOKENS, userid, token, now+300)
+	_, err := pgc.db.Exec(q)
+	if err != nil {
+		return err, ""
+	}
+	return nil, token
+}
+
+func (pgc *PostgresConnector) GetToken(token string) error {
+	q := fmt.Sprintf(`SELECT * FROM %s WHERE token='%s'`, SESSION_TOKENS, token)
+	rows, err := pgc.db.Query(q)
+	if err != nil {
+		return err
+	}
+	var s SessionTokenRecord
+	for rows.Next() {
+		rows.Scan(&s.token, &s.userid, &s.expiry_epoch)
+	}
+	now := time.Now().Unix()
+	if int(now) > s.expiry_epoch {
+		return fmt.Errorf("%d > %d, token expired", now, s.expiry_epoch)
+		// TODO: Delete Token
+	} else {
+		return nil
+	}
+}
+
+func (pgc *PostgresConnector) RegisterUser(email string, password string) error {
+	// Get SHA256 string of user and pass
+	email_hash := hex.EncodeToString(getSHA256Hash(email))
+	password_hash := hex.EncodeToString(getSHA256Hash(password))
+	log.Printf("Registering user '%s':'%s' (%s:%s)...\n", email, password, email_hash[:3], password_hash[:3])
+	q := fmt.Sprintf("INSERT INTO %s (email, password) VALUES ('%s', '%s')", USER_CREDENTIALS, email_hash, password_hash)
+	_, err := pgc.db.Exec(q)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (pgc *PostgresConnector) QueryUser(email string, password string) (error, UserCredentialRecord) {
+	email_hash := hex.EncodeToString(getSHA256Hash(email))
+	password_hash := hex.EncodeToString(getSHA256Hash(password))
+	log.Printf("Querying user '%s':'%s' (%s:%s)...\n", email, password, email_hash[:3], password_hash[:3])
 	var uc UserCredentialRecord
 	q := fmt.Sprintf(`SELECT * FROM %s WHERE email='%s'`, USER_CREDENTIALS, email_hash)
 	rows, err := pgc.db.Query(q)
@@ -130,55 +177,11 @@ func (pgc *PostgresConnector) QueryUser(email_hash string, password_hash string)
 		rows.Scan(&uc.userid, &uc.email, &uc.password)
 	}
 	if uc.password == password_hash {
-		fmt.Println("  Success!\n")
+		log.Println("  Found User!")
 		return nil, uc
 	} else {
 		return fmt.Errorf("Mismatch in password, expected %s, got %s", uc.password, password_hash), uc
 	}
-}
-
-func (pgc *PostgresConnector) CreateAndStoreSessionToken(userid int) (error, string) {
-	now := time.Now().Unix()
-	token := hex.EncodeToString(getSHA256Hash(string(now)))
-	log.Printf("Created token - expiry: %d, userid: %d, token: %s", now+300, userid, token)
-	q := fmt.Sprintf("INSERT INTO %s (userid, token, expiry_epoch) VALUES ('%d', '%s', '%d')", SESSION_TOKENS, userid, token, now+300)
-	_, err := pgc.db.Exec(q)
-	if err != nil {
-		fmt.Println("err = ", err)
-		return err, ""
-	}
-	return nil, token
-}
-
-func (pgc *PostgresConnector) GetToken(token string) error {
-	q := fmt.Sprintf(`SELECT * FROM %s WHERE token='%s'`, SESSION_TOKENS, token)
-	rows, err := pgc.db.Query(q)
-	if err != nil {
-		log.Println("err = ", err)
-		return err
-	}
-	var s SessionTokenRecord
-	for rows.Next() {
-		rows.Scan(&s.token, &s.userid, &s.expiry_epoch)
-	}
-	now := time.Now().Unix()
-	if int(now) > s.expiry_epoch {
-		return fmt.Errorf("%d > %d, token expired", now, s.expiry_epoch)
-		// Delete Token
-	} else {
-		return nil
-	}
-}
-
-func (pgc *PostgresConnector) RegisterUser(email_hash string, password_hash string) error {
-	log.Printf("Registering [%s:%s]...\n", email_hash[:5], password_hash[:5])
-	q := fmt.Sprintf("INSERT INTO %s (email, password) VALUES ('%s', '%s')", USER_CREDENTIALS, email_hash, password_hash)
-	_, err := pgc.db.Exec(q)
-	if err != nil {
-		log.Println("err = ", err)
-		return err
-	}
-	return nil
 }
 
 func (pgc *PostgresConnector) DropTable(tablename string) error {

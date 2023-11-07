@@ -20,16 +20,16 @@ func main() {
 	flag.Parse()
 
 	// Consider moving to App() function
-	var pgc PostgresConnector
+	var postgres PostgresConnector
 	go func() {
-		pgc = NewPostgresConnector(*demoMode)
-		rt := NewRouter(8080, pgc)
+		postgres = NewPostgresConnector(*demoMode)
+		rt := NewRouter(5001, postgres)
 		rt.StartRouter()
 	}()
 
 	sig := <-cancelChan
 	log.Printf("Caught signal %v", sig)
-	_ = pgc.DropTable(SESSION_TOKENS)
-	_ = pgc.DropTable(USER_CREDENTIALS)
+	_ = postgres.DropTable(SESSION_TOKENS)
+	_ = postgres.DropTable(USER_CREDENTIALS)
 
 }

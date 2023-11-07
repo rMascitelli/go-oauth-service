@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	RESOURCE_URL     = "http://localhost:5555"
-	AUTH_SERVICE_URL = "http://localhost:8080"
+	RESOURCE_URL     = "http://localhost:5002"
+	AUTH_SERVICE_URL = "http://localhost:5001"
 )
 
 type UserCredentialForm struct {
@@ -19,19 +19,20 @@ type UserCredentialForm struct {
 	Password string `json:"password"`
 }
 
-// TODO: What is a more secure way to store this access token?
-var AccessToken string
+type TokenResponse struct {
+	Token string `json:"token"`
+}
 
-func GetResource(w http.ResponseWriter, r *http.Request) {
-	AccessToken = "123"
+var activeToken TokenResponse
+
+func GetResource(w http.ResponseWriter, req *http.Request) {
 	fmt.Println("HTTP JSON POST URL:", RESOURCE_URL)
-
-	var introspectReq = []byte(fmt.Sprintf(`{
-		"token": "%s"
-	}`, AccessToken))
-	request, error := http.NewRequest("POST", RESOURCE_URL+"/access_resource", bytes.NewBuffer(introspectReq))
+	tokenJson, err := json.Marshal(activeToken)
+	if err != nil {
+		log.Println("Failed to marshal activeToken")
+	}
+	request, error := http.NewRequest("POST", RESOURCE_URL+"/access_resource", bytes.NewBuffer(tokenJson))
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
-
 	client := &http.Client{}
 	response, error := client.Do(request)
 	if error != nil {
@@ -40,21 +41,14 @@ func GetResource(w http.ResponseWriter, r *http.Request) {
 	defer response.Body.Close()
 
 	if response.StatusCode == 200 {
-		http.Redirect(w, r, "/resource.html", http.StatusFound)
+		http.Redirect(w, req, "/resource.html", http.StatusFound)
 	} else {
-		http.Redirect(w, r, "/", http.StatusFound)
+		http.Redirect(w, req, "/", http.StatusFound)
 	}
 }
 
 func SendRegisterRequest(w http.ResponseWriter, r *http.Request) {
-	SendUserCredentialForm(w, r, AUTH_SERVICE_URL+"/register", "/", "/")
-}
-
-func SendAuthRequest(w http.ResponseWriter, r *http.Request) {
-	SendUserCredentialForm(w, r, AUTH_SERVICE_URL+"/auth", "/welcome.html", "/")
-}
-
-func SendUserCredentialForm(w http.ResponseWriter, r *http.Request, endpointURL string, passRoute string, failRoute string) {
+	endpointURL := AUTH_SERVICE_URL + "/register?registry_type=user"
 	log.Printf("Sending UserCred form request to %s...\n", endpointURL)
 	r.ParseForm()
 	creds := UserCredentialForm{
@@ -73,11 +67,44 @@ func SendUserCredentialForm(w http.ResponseWriter, r *http.Request, endpointURL 
 		panic(err)
 	}
 	defer response.Body.Close()
+	http.Redirect(w, r, "/", http.StatusFound)
+}
 
+func SendAuthRequest(w http.ResponseWriter, req *http.Request) {
+	endpointURL := AUTH_SERVICE_URL + "/login"
+	log.Printf("Sending UserCred form request to %s...\n", endpointURL)
+
+	//  Parse login form
+	req.ParseForm()
+	creds := UserCredentialForm{
+		Email:    req.FormValue("email"),
+		Password: req.FormValue("password"),
+	}
+
+	client := &http.Client{}
+	credsJson, _ := json.Marshal(creds)
+	request, err := http.NewRequest("POST", endpointURL, bytes.NewBuffer(credsJson))
+	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	response, err := client.Do(request)
+	if err != nil {
+		panic(err)
+	}
+	defer response.Body.Close()
+
+	// Get token in response
+	tempToken := TokenResponse{}
+	err = json.NewDecoder(response.Body).Decode(&tempToken)
+	if err != nil {
+		log.Printf("Error decoding Token payload, err: %v\n", err)
+		return
+	}
+
+	activeToken.Token = tempToken.Token
+	log.Println("Set active token to", activeToken.Token[:3])
 	if response.StatusCode == 200 {
-		http.Redirect(w, r, passRoute, http.StatusFound)
+		http.Redirect(w, req, "/welcome.html", http.StatusFound)
 	} else {
-		http.Redirect(w, r, failRoute, http.StatusFound)
+		http.Redirect(w, req, "/", http.StatusFound)
 	}
 }
 
@@ -94,14 +121,7 @@ func outputHTML(w http.ResponseWriter, filename string, data interface{}) {
 	}
 }
 
-//TODO:
-//	Currently, client is sending AUTH requests directly to Auth Service and serving its own resource
-//	Need to split interactions into 2 categories:
-//		Auth service: 		Register, Login, and getting to Welcome.html
-//		Resource service: 	Use token from Auth service to make request, get resource.html back
-
 func main() {
-	AccessToken = ""
 	fs := http.FileServer(http.Dir("../public"))
 	http.Handle("/", fs)
 	http.HandleFunc("/send_register_request", SendRegisterRequest)

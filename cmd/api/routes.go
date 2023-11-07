@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -17,8 +16,8 @@ import (
 //	https://www.rfc-editor.org/rfc/rfc7662
 
 type Router struct {
-	port     int
-	postgres PostgresConnector
+	port    int
+	handler Handler
 }
 
 type UserCredentialForm struct {
@@ -30,14 +29,18 @@ type IntrospectResponse struct {
 	Active bool `json:"active"`
 }
 
+type LoginResponse struct {
+	Token string `json:"token"`
+}
+
 func NewRouter(port int, postgres PostgresConnector) Router {
 	if port <= 0 {
 		log.Fatalf("Cannot create server at port %d\n", port)
 	}
 
 	return Router{
-		port:     port,
-		postgres: postgres,
+		port:    port,
+		handler: NewHandler(postgres),
 	}
 }
 
@@ -50,36 +53,16 @@ func (r *Router) StartRouter() {
 }
 
 func (r *Router) Login(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "POST" {
-		uc := UserCredentialForm{}
-		err := json.NewDecoder(req.Body).Decode(&uc)
-		if err != nil {
-			log.Println("Failed to Auth user")
-			writeJSONResponse(w, 400, "Failure")
-			return
+	err, token := r.handler.HandleUserLogin(req)
+	if err != nil {
+		log.Printf("Error occured while handling User Login, err: %v\n", err)
+		writeJSONResponse(w, 400, err.Error())
+	} else {
+		log.Printf("Succesfully authenticated")
+		loginResp := LoginResponse{
+			Token: token,
 		}
-		log.Printf("Got auth request: %+v\n", uc)
-
-		// Get SHA256 string of user and pass
-		// Make entry into DB
-		email_hash := hex.EncodeToString(getSHA256Hash(uc.Email))
-		pass_hash := hex.EncodeToString(getSHA256Hash(uc.Password))
-		err, queried_user := r.postgres.QueryUser(email_hash, pass_hash)
-		if err != nil {
-			log.Println("Failed to authorize, err: ", err)
-			writeJSONResponse(w, 400, "Failure")
-			return
-		}
-
-		err, _ = r.postgres.CreateAndStoreSessionToken(queried_user.userid)
-		if err != nil {
-			log.Println("Failed to create session token, err: ", err)
-			writeJSONResponse(w, 400, "Failure")
-			return
-		}
-
-		writeJSONResponse(w, 200, "Success!")
-		return
+		writeJSONResponse(w, 200, loginResp)
 	}
 }
 
@@ -98,11 +81,7 @@ func (r *Router) Register(w http.ResponseWriter, req *http.Request) {
 			}
 			log.Printf("  Got User register request: %+v\n", uc)
 
-			// Get SHA256 string of user and pass
-			// Make entry into DB
-			email_hash := hex.EncodeToString(getSHA256Hash(uc.Email))
-			pass_hash := hex.EncodeToString(getSHA256Hash(uc.Password))
-			r.postgres.RegisterUser(email_hash, pass_hash)
+			r.handler.postgres.RegisterUser(uc.Email, uc.Password)
 			log.Printf("  Registered user with email %s\n", uc.Email)
 			writeJSONResponse(w, 200, "Success!")
 			url.ParseQuery("")
@@ -132,7 +111,7 @@ func (r *Router) Introspect(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := r.postgres.GetToken(authRequest.Token); err != nil {
+	if err := r.handler.postgres.GetToken(authRequest.Token); err != nil {
 		log.Println("Failed to get token, err: ", err)
 		writeJSONResponse(w, 400, introspectResponse)
 		return

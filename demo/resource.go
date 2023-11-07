@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	INTROSPECT_ENDPOINT = "http://localhost:8080/introspect"
+	INTROSPECT_ENDPOINT = "http://localhost:5001/introspect"
 )
 
 type Token struct {
@@ -69,5 +69,5 @@ func main() {
 	fmt.Println("Resource: Hello world!")
 
 	http.HandleFunc("/access_resource", AccessResource)
-	http.ListenAndServe(":5555", nil)
+	http.ListenAndServe(":5002", nil)
 }
