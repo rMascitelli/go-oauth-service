@@ -1,0 +1,8 @@
+[15 Nov 23 22:03 EST]
+---
+  Ran RegisterTest 1000 times in 1.466 sec (682.13 req/s)
+  Ran LoginTest 1000 times in 13.736 sec (72.80 req/s)
+---
+  Ran RegisterTest 10000 times in 13.084 sec (764.29 req/s)
+  Ran LoginTest 10000 times in 85.651 sec (116.75 req/s)
+---

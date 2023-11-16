@@ -52,10 +52,10 @@ func (r *Router) Login(w http.ResponseWriter, req *http.Request) {
 		log.Printf("Succesfully authenticated")
 		writeJSONResponse(w, 200, loginResponse)
 	}
-	elapsed_ms := float64(time.Since(start).Microseconds()) / 1000
-	fmt.Printf("Elapsed login serve time - %f\n", elapsed_ms)
+	elapsed_s := float64(time.Since(start).Microseconds()) / 1000
+	log.Printf("Elapsed login serve time - %f\n", elapsed_s)
 	r.metricsClient.IncrementCounter(NUM_LOGIN, SERVICENAME)
-	r.metricsClient.SetGaugeVal(ELAPSED_LOGIN_MS, SERVICENAME, elapsed_ms)
+	r.metricsClient.SetGaugeVal(ELAPSED_LOGIN_MS, SERVICENAME, elapsed_s)
 }
 
 func (r *Router) Register(w http.ResponseWriter, req *http.Request) {
@@ -67,8 +67,10 @@ func (r *Router) Register(w http.ResponseWriter, req *http.Request) {
 		log.Printf("Succesfully registered")
 		writeJSONResponse(w, 200, "Success!")
 	}
+	elapsed_s := float64(time.Since(start).Microseconds()) / 1000
+	log.Printf("Elapsed register serve time - %.3f\n", elapsed_s)
 	r.metricsClient.IncrementCounter(NUM_REGISTRY, SERVICENAME)
-	r.metricsClient.SetGaugeVal(ELAPSED_REGISTRY_MS, SERVICENAME, float64(time.Since(start)))
+	r.metricsClient.SetGaugeVal(ELAPSED_REGISTRY_MS, SERVICENAME, elapsed_s)
 }
 
 func (r *Router) Introspect(w http.ResponseWriter, req *http.Request) {
@@ -81,6 +83,8 @@ func (r *Router) Introspect(w http.ResponseWriter, req *http.Request) {
 		log.Printf("Token is valid!")
 		writeJSONResponse(w, 200, introspectResponse)
 	}
+	elapsed_s := float64(time.Since(start).Microseconds()) / 1000
+	log.Printf("Elapsed register serve time - %.3f\n", elapsed_s)
 	r.metricsClient.IncrementCounter(NUM_LOGIN, SERVICENAME)
-	r.metricsClient.SetGaugeVal(ELAPSED_LOGIN_MS, SERVICENAME, float64(time.Since(start)))
+	r.metricsClient.SetGaugeVal(ELAPSED_LOGIN_MS, SERVICENAME, elapsed_s)
 }
