@@ -15,11 +15,11 @@ const (
 	AUTH_SERVICE_URL = "http://localhost:5001"
 )
 
-func LoginTest() error {
+func LoginTest(id int) error {
 	endpointURL := AUTH_SERVICE_URL + "/login"
 	creds := UserCredentialForm{
-		Email:    "root",
-		Password: "dev",
+		Email:    fmt.Sprintf("randuser-%d", id),
+		Password: fmt.Sprintf("randpass-%d", id),
 	}
 	client := &http.Client{}
 	credsJson, _ := json.Marshal(creds)
@@ -54,6 +54,9 @@ func TestStarter(t *testing.T) {
 	time.Sleep(time.Second * 3)
 
 	var err error
-	err = LoginTest()
-	assert.Nil(t, err)
+	for i := 0; i < 100; i++ {
+		err = LoginTest(i)
+		assert.Nil(t, err)
+	}
+
 }
