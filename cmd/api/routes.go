@@ -78,7 +78,7 @@ func (r *Router) Introspect(w http.ResponseWriter, req *http.Request) {
 	err, introspectResponse := r.handler.HandleIntrospect(req)
 	if err != nil {
 		log.Printf("Error occured while handling Introspect, err:\n  %v\n", err)
-		writeJSONResponse(w, 400, err.Error())
+		writeJSONResponse(w, 400, introspectResponse)
 	} else {
 		log.Printf("Token is valid!")
 		writeJSONResponse(w, 200, introspectResponse)
