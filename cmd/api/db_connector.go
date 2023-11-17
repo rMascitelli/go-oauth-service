@@ -5,10 +5,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
 
 	_ "github.com/lib/pq"
 )
+
+// Open psql:
+//		sudo -u postgres psql
 
 // Make sure you have created a db with the same 'dbname' as this file
 //		CREATE DATABASE dbname;
@@ -28,9 +32,9 @@ type UserCredentialRecord struct {
 }
 
 type SessionTokenRecord struct {
-	token        string
-	userid       int
-	expiry_epoch int
+	Token       string
+	Userid      int
+	ExpiryEpoch int
 }
 
 // In case we want to add a different type of DB
@@ -39,24 +43,26 @@ type DBConnector interface {
 }
 
 type PostgresConnector struct {
-	host      string
-	port      int
-	user      string
-	password  string
-	dbname    string
-	tablename string
-	conninfo  string
-	db        *sql.DB
+	host          string
+	port          int
+	user          string
+	password      string
+	dbname        string
+	tablename     string
+	conninfo      string
+	db            *sql.DB
+	tokensCreated int
 }
 
 func NewPostgresConnector(demo bool) PostgresConnector {
 	pgc := PostgresConnector{
-		host:      "localhost",
-		port:      5432,
-		user:      "postgres",
-		password:  "new_password",
-		dbname:    "oauth_tables",
-		tablename: "example",
+		host:          "localhost",
+		port:          5432,
+		user:          "postgres",
+		password:      "new_password",
+		dbname:        "oauth_tables",
+		tablename:     "example",
+		tokensCreated: 1,
 	}
 	pgc.conninfo = fmt.Sprintf("user=%s password=%s host=%s dbname=%s sslmode=disable", pgc.user, pgc.password, pgc.host, pgc.dbname)
 
@@ -122,7 +128,9 @@ func (pgc *PostgresConnector) CreateRequiredTables() error {
 
 func (pgc *PostgresConnector) CreateAndStoreSessionToken(userid int) (error, string) {
 	now := time.Now().Unix()
-	token := hex.EncodeToString(getSHA256Hash(fmt.Sprint(now)))
+	randnum := rand.New(rand.NewSource(time.Now().UnixNano())).Int63()
+	token := hex.EncodeToString(getSHA256Hash(fmt.Sprint(randnum)))
+	pgc.tokensCreated++
 	log.Printf("Created token - expiry: %d, userid: %d, token: %s", now+300, userid, token)
 	q := fmt.Sprintf("INSERT INTO %s (userid, token, expiry_epoch) VALUES ('%d', '%s', '%d')", SESSION_TOKENS, userid, token, now+300)
 	_, err := pgc.db.Exec(q)
@@ -140,11 +148,11 @@ func (pgc *PostgresConnector) GetToken(token string) error {
 	}
 	var s SessionTokenRecord
 	for rows.Next() {
-		rows.Scan(&s.token, &s.userid, &s.expiry_epoch)
+		rows.Scan(&s.Token, &s.Userid, &s.ExpiryEpoch)
 	}
 	now := time.Now().Unix()
-	if int(now) > s.expiry_epoch {
-		return fmt.Errorf("%d > %d, token expired", now, s.expiry_epoch)
+	if int(now) > s.ExpiryEpoch {
+		return fmt.Errorf("%d > %d, token expired", now, s.ExpiryEpoch)
 		// TODO: Delete Token
 	} else {
 		return nil
