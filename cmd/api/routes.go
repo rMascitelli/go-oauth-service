@@ -85,6 +85,6 @@ func (r *Router) Introspect(w http.ResponseWriter, req *http.Request) {
 	}
 	elapsed_s := float64(time.Since(start).Microseconds()) / 1000
 	log.Printf("Elapsed register serve time - %.3f\n", elapsed_s)
-	r.metricsClient.IncrementCounter(NUM_LOGIN, SERVICENAME)
-	r.metricsClient.SetGaugeVal(ELAPSED_LOGIN_MS, SERVICENAME, elapsed_s)
+	r.metricsClient.IncrementCounter(NUM_INTROSPECT, SERVICENAME)
+	r.metricsClient.SetGaugeVal(ELAPSED_INTROSPECT_MS, SERVICENAME, elapsed_s)
 }

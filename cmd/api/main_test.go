@@ -101,7 +101,7 @@ func RegisterTest(id int) error {
 func TestStressor(t *testing.T) {
 	var err error
 	k := 1000
-	numReqList := []int{1 * k, 5 * k}
+	numReqList := []int{1 * k, 10 * k}
 
 	logFile, _ := os.OpenFile(RESULTS_LOGFILE, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	logFile.Write([]byte(fmt.Sprintf("[%s]\n", time.Now().Format(time.RFC822))))

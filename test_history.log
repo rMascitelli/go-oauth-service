@@ -1,4 +1,4 @@
-[15 Nov 23 22:03 EST]
+[15 Nov 23 22:03 EST] First ever tests!
 ---
   Ran RegisterTest 1000 times in 1.466 sec (682.13 req/s)
   Ran LoginTest 1000 times in 13.736 sec (72.80 req/s)
@@ -6,13 +6,13 @@
   Ran RegisterTest 10000 times in 13.084 sec (764.29 req/s)
   Ran LoginTest 10000 times in 85.651 sec (116.75 req/s)
 ---
-[16 Nov 23 19:57 EST]
+[16 Nov 23 20:12 EST] Added IntrospectTest
 ---
-  Ran RegisterTest 1000 times in 1.359 sec (735.84 req/s)
-  Ran LoginTest 1000 times in 1.496 sec (668.45 req/s)
-  Ran IntrospectTest 1000 times in 0.574 sec (1742.16 req/s)
+  Ran RegisterTest 1000 times in 1.410 sec (709.22 req/s)
+  Ran LoginTest 1000 times in 3.851 sec (259.67 req/s)
+  Ran IntrospectTest 1000 times in 2.639 sec (378.93 req/s)
 ---
-  Ran RegisterTest 5000 times in 6.645 sec (752.45 req/s)
-  Ran LoginTest 5000 times in 11.877 sec (420.98 req/s)
-  Ran IntrospectTest 5000 times in 7.052 sec (709.02 req/s)
+  Ran RegisterTest 10000 times in 13.052 sec (766.17 req/s)
+  Ran LoginTest 10000 times in 48.116 sec (207.83 req/s)
+  Ran IntrospectTest 10000 times in 37.940 sec (263.57 req/s)
 ---
