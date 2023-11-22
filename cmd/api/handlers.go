@@ -37,7 +37,7 @@ func (h *Handler) HandleUserLogin(req *http.Request) (error, LoginResponse) {
 
 	err, token := h.postgres.CreateAndStoreSessionToken(queried_user.userid)
 	if err != nil {
-		return errors.New("Error while creating session token"), loginResponse
+		return fmt.Errorf("Error while creating session token, err: %v", err), loginResponse
 	}
 	loginResponse.Token = token
 	return nil, loginResponse

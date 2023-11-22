@@ -16,3 +16,9 @@
   Ran LoginTest 10000 times in 48.116 sec (207.83 req/s)
   Ran IntrospectTest 10000 times in 37.940 sec (263.57 req/s)
 ---
+[22 Nov 23 09:18 EST]  Parallelized test requests
+---
+  Ran RegisterTest 100 times in 0.773 sec (129.37 req/s)
+  Ran LoginTest 100 times in 0.904 sec (110.62 req/s)
+  Ran IntrospectTest 100 times in 0.062 sec (1612.90 req/s)
+---

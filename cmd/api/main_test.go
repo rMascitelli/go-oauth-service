@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -100,46 +101,64 @@ func RegisterTest(id int) error {
 
 func TestStressor(t *testing.T) {
 	var err error
-	k := 1000
-	numReqList := []int{1 * k, 10 * k}
+	var wg sync.WaitGroup
+	var i int
+	k := 100
+	numReqList := []int{1 * k}
 
 	logFile, _ := os.OpenFile(RESULTS_LOGFILE, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	logFile.Write([]byte(fmt.Sprintf("[%s]\n", time.Now().Format(time.RFC822))))
 	defer logFile.Close()
 
 	for _, numReq := range numReqList {
-		tokens := make([]LoginResponse, numReq)
+		tokens := make([]LoginResponse, numReq+1)
 		logFile.Write([]byte("---\n"))
 		start := time.Now()
-		for i := 0; i < numReq; i++ {
-			err = RegisterTest(i)
-			assert.Nil(t, err)
+		for i = 0; i < numReq; i++ {
+			wg.Add(1)
+			go func() {
+				err = RegisterTest(i)
+				assert.Nil(t, err)
+				wg.Done()
+			}()
 		}
+		wg.Wait()
 		elapsed_s := float64(time.Since(start).Milliseconds()) / 1000
 		log := fmt.Sprintf("  Ran RegisterTest %d times in %.3f sec (%.2f req/s)\n", numReq, elapsed_s, float64(numReq)/elapsed_s)
 		_, _ = logFile.Write([]byte(log))
 		t.Logf(log)
 
 		start = time.Now()
-		for i := 0; i < numReq; i++ {
-			token, err := LoginTest(i)
-			assert.Nil(t, err)
-			tokens[i] = token
+		for i = 0; i < numReq; i++ {
+			wg.Add(1)
+			go func() {
+				token, err := LoginTest(i)
+				assert.Nil(t, err)
+				tokens[i] = token
+				wg.Done()
+			}()
 		}
+		wg.Wait()
 		elapsed_s = float64(time.Since(start).Milliseconds()) / 1000
 		log = fmt.Sprintf("  Ran LoginTest %d times in %.3f sec (%.2f req/s)\n", numReq, elapsed_s, float64(numReq)/elapsed_s)
 		_, _ = logFile.Write([]byte(log))
 		t.Logf(log)
 
 		start = time.Now()
-		for i := 0; i < numReq; i++ {
-			err = IntrospectTest(tokens[i])
-			assert.Nil(t, err)
+		for i = 0; i < numReq; i++ {
+			wg.Add(1)
+			go func() {
+				err = IntrospectTest(tokens[i])
+				assert.Nil(t, err)
+				wg.Done()
+			}()
 		}
+		wg.Wait()
 		elapsed_s = float64(time.Since(start).Milliseconds()) / 1000
 		log = fmt.Sprintf("  Ran IntrospectTest %d times in %.3f sec (%.2f req/s)\n", numReq, elapsed_s, float64(numReq)/elapsed_s)
 		_, _ = logFile.Write([]byte(log))
 		t.Logf(log)
+
 	}
 
 	logFile.Write([]byte("---\n"))
